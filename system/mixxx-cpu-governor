@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Pin every CPU core to a scaling governor (default: performance).
+#
+#   mixxx-cpu-governor [governor]
+#
+# Installed to /usr/local/sbin by install.sh and run at boot by
+# mixxx-cpu-governor.service.
+#
+# Why not cpufrequtils: that package was dropped from Debian after bullseye, so
+# it does not exist on trixie / Raspberry Pi OS trixie. sysfs is the interface
+# every cpufreq driver exposes, needs no package, and works the same on Pi 3,
+# Pi 4 and Pi 5.
+#
+set -eu
+
+gov="${1:-performance}"
+found=0
+
+for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+    [ -e "$f" ] || continue
+    echo "$gov" > "$f"
+    found=1
+done
+
+if [ "$found" -ne 1 ]; then
+    echo "mixxx-cpu-governor: no cpufreq interface under /sys -- nothing to do" >&2
+    exit 1
+fi

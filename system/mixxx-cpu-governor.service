@@ -1,0 +1,16 @@
+[Unit]
+Description=Pin CPU scaling governor to performance (low-latency audio)
+Documentation=https://github.com/mixxxdj/mixxx/issues/11091
+# Run after anything that might install a governor of its own: Raspberry Pi OS
+# ships an 'ondemand' init script, older images ship cpufrequtils. Neither is
+# required to exist -- After= on an absent unit is a no-op.
+After=ondemand.service cpufrequtils.service
+ConditionPathExists=/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/mixxx-cpu-governor performance
+
+[Install]
+WantedBy=multi-user.target

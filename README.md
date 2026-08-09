@@ -17,11 +17,26 @@ Safe to re-run at any time — every step is idempotent.
 
 | Step | Change | Why |
 |---|---|---|
-| 1 | `cpufrequtils` governor → `performance` | Raspbian defaults to `ondemand`, which idles the CPU low and ramps up only after load appears — the wrong behaviour for audio callbacks. |
+| 1 | CPU scaling governor → `performance`, via `mixxx-cpu-governor.service` | Raspberry Pi OS defaults to `ondemand`, which idles the CPU low and ramps up only after load appears — the wrong behaviour for audio callbacks. |
 | 2 | Adds the login user to the `audio` group | Prerequisite for the realtime limits below. |
 | 3 | Installs `/etc/security/limits.d/99-audio.conf` | Lets Mixxx's audio thread get realtime scheduling (`rtprio 95`) and lock memory. |
-| 4 | Builds a `(tight bend)` copy of the DDJ-FLX4 mapping | Fixes the floaty jog-wheel pitch bend. See below. |
+| 4 | Builds a `(rekordbox patch)` copy of the DDJ-FLX4 mapping | Fixes the floaty jog-wheel pitch bend. See below. |
 | 5 | Restores `config/` into `~/.mixxx` if present | Optional: carries your saved preferences across images. |
+
+### On the governor
+
+Debian dropped `cpufrequtils` after bullseye, so it does not exist on trixie or
+Raspberry Pi OS trixie. Step 1 therefore writes the governor through sysfs with
+`system/mixxx-cpu-governor` and keeps it across reboots with
+`system/mixxx-cpu-governor.service` — no package to install, same code path on
+Pi 3, 4 and 5. It also disables the `ondemand` init script that Raspberry Pi OS
+runs at boot, and syncs `/etc/default/cpufrequtils` if that file happens to
+exist on an older image.
+
+```bash
+systemctl status mixxx-cpu-governor.service     # active (exited)
+cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+```
 
 ## The jog wheel fix
 
@@ -40,7 +55,7 @@ is therefore `25 × buffer period`:
 That's the slow ramp-up and the overshoot that make beatmatching impossible.
 Upstream issue: <https://github.com/mixxxdj/mixxx/issues/11091>
 
-`mapping/Pioneer-DDJ-FLX4-tightbend.js` overrides `PioneerDDJFLX4.jogTurn` to
+`mapping/Pioneer-DDJ-FLX4-rekordbox-patch.js` overrides `PioneerDDJFLX4.jogTurn` to
 drive `[ChannelN],wheel` instead, which `RateControl` applies unfiltered and
 additively (`rate += wheelFactor`). A 20 ms timer turns the tick stream into a
 rate offset and zeroes it as soon as the wheel stops. Top-of-platter scratching
@@ -49,8 +64,9 @@ still uses `scratchTick()` and is untouched.
 The override is a **separate script file** appended to the mapping XML's
 `<scriptfiles>` block, not an edit to the vendor script — so Mixxx upgrades can
 replace `Pioneer-DDJ-FLX4-script.js` without clobbering the fix. The installer
-symlinks the vendor script into `~/.mixxx/controllers` so it always tracks the
-installed version.
+symlinks every script the mapping references (the vendor script plus shared
+helpers like `midi-components-0.0.js`) into the Mixxx controllers dir, so they
+always track the installed version.
 
 Tune `PioneerDDJFLX4.bendSensitivity` at the top of the override file:
 `0.02` is a moderate nudge, `0.01` finer, `0.04` stronger.
@@ -66,7 +82,7 @@ The override script assumes the `PioneerDDJFLX4` namespace and the stock
 
 ## After install
 
-Select **"… (tight bend)"** in Preferences → Controllers, then set the audio
+Select **"… (rekordbox patch)"** in Preferences → Controllers, then set the audio
 buffer in Preferences → Sound Hardware. Lower buffer = less latency *and*
 (for anything still using the `jog` path, e.g. shift-seek) a shorter tail.
 

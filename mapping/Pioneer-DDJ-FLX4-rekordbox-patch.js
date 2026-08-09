@@ -1,4 +1,4 @@
-// Pioneer-DDJ-FLX4-tightbend.js
+// Pioneer-DDJ-FLX4-rekordbox-patch.js
 //
 // Override for the stock DDJ-FLX4 mapping: replaces the "floaty" jog-wheel
 // pitch bend with a tight one.
@@ -25,7 +25,7 @@
     if (typeof PioneerDDJFLX4 === "undefined") {
         // Load order is wrong: this file must come AFTER the vendor script
         // in the mapping XML's <scriptfiles> block.
-        console.log("tightbend: PioneerDDJFLX4 not defined, override skipped");
+        console.log("rekordbox-patch: PioneerDDJFLX4 not defined, override skipped");
         return;
     }
 
@@ -118,6 +118,6 @@
         }
     };
 
-    console.log("tightbend: jog bend override active, sensitivity " +
+    console.log("rekordbox-patch: jog bend override active, sensitivity " +
         PioneerDDJFLX4.bendSensitivity);
 })();
