@@ -8,7 +8,9 @@
 #
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Overridable so a stripped copy of this script can still find system/ and
+# mapping/ -- see the test recipe in CLAUDE.md §3.
+REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 # --- which unprivileged user are we tuning for? ------------------------------
 TARGET_USER="${TARGET_USER:-${SUDO_USER:-$(logname 2>/dev/null || echo pi)}}"
@@ -120,8 +122,26 @@ else
         BASE="$(basename "$SRC_XML")"
         DST_XML="$CONTROLLER_DIR/${BASE%.midi.xml}-${MAPPING_SUFFIX}.midi.xml"
 
+        # Re-running rebuilds the XML from the pristine vendor copy and replaces
+        # the override with the repo's. That's what makes this idempotent and
+        # upgrade-safe, but bendSensitivity is often tuned in the *installed*
+        # copy -- keep it rather than silently discarding it.
+        if [[ -f "$CONTROLLER_DIR/$OVERRIDE_JS" ]] \
+           && ! cmp -s "$REPO_DIR/mapping/$OVERRIDE_JS" "$CONTROLLER_DIR/$OVERRIDE_JS"; then
+            cp "$CONTROLLER_DIR/$OVERRIDE_JS" "$CONTROLLER_DIR/$OVERRIDE_JS.bak"
+            warn "installed override differed from the repo copy"
+            warn "previous version saved as $OVERRIDE_JS.bak -- re-apply any tuning to the repo"
+        fi
+
         cp "$SRC_XML" "$DST_XML"
         cp "$REPO_DIR/mapping/$OVERRIDE_JS" "$CONTROLLER_DIR/$OVERRIDE_JS"
+
+        # Leftovers from the pre-rename version of this repo show up as a second
+        # entry in Mixxx's controller list. Don't delete user files, just say so.
+        for stale in "$CONTROLLER_DIR"/*tightbend*; do
+            [[ -e "$stale" ]] || continue
+            warn "stale $(basename "$stale") from the old 'tightbend' name -- safe to rm"
+        done
 
         # Mixxx resolves <scriptfiles> next to the mapping XML, so every script
         # the vendor mapping pulls in (its own, plus shared helpers like
